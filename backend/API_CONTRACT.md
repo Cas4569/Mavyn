@@ -620,8 +620,8 @@ Common status codes:
 
 ## Frontend Integration Notes
 
-1. **Base URL:** Use `import.meta.env.VITE_API_URL || 'http://localhost:8000'`
-2. **CORS:** Already configured for `http://localhost:5173`
+1. **Base URL:** The Vite app defaults to `/api` and proxies it to `http://127.0.0.1:8000` during development. Set `VITE_API_URL` when connecting to a deployed backend.
+2. **CORS:** The local Vite proxy avoids browser CORS restrictions. Direct browser requests to the backend are allowed from `http://localhost:5173`.
 3. **Source field:** Every response includes `source: "sample"` — frontend can badge "AI-generated (demo)" or similar
 4. **Empty states:** Handle empty arrays (e.g., no competitors, no reviews)
 5. **Images:** All `hero_image`/`image_url` are Unsplash placeholders — replace with real assets later

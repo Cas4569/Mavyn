@@ -18,11 +18,11 @@ from src.routes import (
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
-    print(f"🚀 {settings.app_name} v{settings.app_version} starting up...")
+    print(f"{settings.app_name} v{settings.app_version} starting up...")
     print(f"   CORS enabled for: {settings.cors_origins}")
     yield
     # Shutdown
-    print(f"🛑 {settings.app_name} shutting down...")
+    print(f"{settings.app_name} shutting down...")
 
 
 app = FastAPI(
