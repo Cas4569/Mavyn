@@ -4,6 +4,7 @@
 *.py[cod]
 backend/.venv/
 **/.venv/
+backend/.cache/
 
 # Environment secrets
 .env

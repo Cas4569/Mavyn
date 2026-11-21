@@ -6,6 +6,7 @@ import re
 import time
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
@@ -113,6 +114,7 @@ class GeminiMarketResearch:
         fallback_models: str | list[str] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
         cache_ttl_seconds: int | None = None,
+        cache_snapshot_path: str | Path | None = None,
     ) -> None:
         if api_key is None:
             api_key = settings.gemini_api_key
@@ -141,21 +143,93 @@ class GeminiMarketResearch:
         self._catalog_lock = asyncio.Lock()
         self._detail_locks: dict[str, asyncio.Lock] = {}
         self._request_limit = asyncio.Semaphore(2)
+        self._cache_snapshot_path = (
+            Path(cache_snapshot_path) if cache_snapshot_path is not None else None
+        )
+        self._load_persistent_cache()
+
+    def _load_persistent_cache(self) -> None:
+        try:
+            if self._cache_snapshot_path is None:
+                return
+            if not self._cache_snapshot_path.exists():
+                return
+            snapshot = json.loads(self._cache_snapshot_path.read_text(encoding="utf-8"))
+            if not isinstance(snapshot, dict):
+                return
+            catalog = snapshot.get("catalog")
+            if isinstance(catalog, dict):
+                expires_at_wall = float(catalog["expires_at"])
+                remaining_seconds = max(0.0, expires_at_wall - time.time())
+                self._catalog_cache = (
+                    time.monotonic() + remaining_seconds,
+                    ProductCatalog.model_validate(catalog["data"]),
+                )
+            details = snapshot.get("details")
+            if isinstance(details, dict):
+                for product_id, detail in details.items():
+                    if not isinstance(detail, dict):
+                        continue
+                    expires_at_wall = float(detail["expires_at"])
+                    remaining_seconds = max(0.0, expires_at_wall - time.time())
+                    self._detail_cache[product_id] = (
+                        time.monotonic() + remaining_seconds,
+                        ProductDetail.model_validate(detail["data"]),
+                    )
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValidationError, ValueError):
+            return
+
+    def _save_persistent_cache(self) -> None:
+        try:
+            if self._cache_snapshot_path is None:
+                return
+            snapshot: dict[str, Any] = {
+                "catalog": None,
+                "details": {},
+            }
+            if self._catalog_cache is not None:
+                expires_at, catalog = self._catalog_cache
+                snapshot["catalog"] = {
+                    "expires_at": time.time() + max(0.0, expires_at - time.monotonic()),
+                    "data": catalog.model_dump(mode="json"),
+                }
+            for product_id, (expires_at, detail) in self._detail_cache.items():
+                snapshot["details"][product_id] = {
+                    "expires_at": time.time() + max(0.0, expires_at - time.monotonic()),
+                    "data": detail.model_dump(mode="json"),
+                }
+            self._cache_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary_path = self._cache_snapshot_path.with_suffix(".tmp")
+            temporary_path.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
+            temporary_path.replace(self._cache_snapshot_path)
+        except OSError:
+            return
 
     async def list_products(self) -> ProductCatalog:
         now = time.monotonic()
         if self._catalog_cache and self._catalog_cache[0] > now:
-            return self._catalog_cache[1].model_copy(deep=True)
+            result = self._catalog_cache[1].model_copy(deep=True)
+            result.cached = True
+            return result
 
         async with self._catalog_lock:
             now = time.monotonic()
             if self._catalog_cache and self._catalog_cache[0] > now:
-                return self._catalog_cache[1].model_copy(deep=True)
+                result = self._catalog_cache[1].model_copy(deep=True)
+                result.cached = True
+                return result
 
-            payload, citations = await self._generate(
-                self._catalog_prompt(),
-                _schema_for(_CatalogFacts),
-            )
+            try:
+                payload, citations = await self._generate(
+                    self._catalog_prompt(),
+                    _schema_for(_CatalogFacts),
+                )
+            except GeminiResearchRateLimitError:
+                if self._catalog_cache is not None:
+                    result = self._catalog_cache[1].model_copy(deep=True)
+                    result.cached = True
+                    return result
+                raise
             facts = _validate_facts(_CatalogFacts, payload)
             products: list[Product] = []
             seen_ids: set[str] = set()
@@ -179,6 +253,7 @@ class GeminiMarketResearch:
                 fetched_at=datetime.now(UTC).isoformat(),
             )
             self._catalog_cache = (now + self.cache_ttl_seconds, catalog)
+            self._save_persistent_cache()
             return catalog.model_copy(deep=True)
 
     async def list_products_by_category(self, category_id: str) -> ProductList | None:
@@ -195,6 +270,7 @@ class GeminiMarketResearch:
             total=len(products),
             sources=_unique_sources(source for item in products for source in item.sources),
             fetched_at=catalog.fetched_at,
+            cached=catalog.cached,
         )
 
     async def get_product_detail(self, product_id: str) -> ProductDetail | None:
@@ -209,19 +285,30 @@ class GeminiMarketResearch:
         now = time.monotonic()
         cached = self._detail_cache.get(product_id)
         if cached and cached[0] > now:
-            return cached[1].model_copy(deep=True)
+            result = cached[1].model_copy(deep=True)
+            result.cached = True
+            return result
 
         lock = self._detail_locks.setdefault(product_id, asyncio.Lock())
         async with lock:
             now = time.monotonic()
             cached = self._detail_cache.get(product_id)
             if cached and cached[0] > now:
-                return cached[1].model_copy(deep=True)
+                result = cached[1].model_copy(deep=True)
+                result.cached = True
+                return result
 
-            payload, citations = await self._generate(
-                self._detail_prompt(catalog_product),
-                _schema_for(_ProductDetailFacts),
-            )
+            try:
+                payload, citations = await self._generate(
+                    self._detail_prompt(catalog_product),
+                    _schema_for(_ProductDetailFacts),
+                )
+            except GeminiResearchRateLimitError:
+                if cached is not None:
+                    result = cached[1].model_copy(deep=True)
+                    result.cached = True
+                    return result
+                raise
             facts = _validate_facts(_ProductDetailFacts, payload)
             if _slug(facts.product.name) == _slug(catalog_product.name):
                 detail_product = _build_product(
@@ -265,6 +352,7 @@ class GeminiMarketResearch:
                 cache_expires_at,
                 detail,
             )
+            self._save_persistent_cache()
             return detail.model_copy(deep=True)
 
     async def _generate(
@@ -319,7 +407,9 @@ class GeminiMarketResearch:
             except GeminiResearchAuthenticationError:
                 raise
             except GeminiResearchRateLimitError:
-                raise
+                last_error = GeminiResearchRateLimitError(
+                    "Gemini Search quota or rate limit reached. Trying an available fallback."
+                )
             except (
                 GeminiResearchModelUnavailableError,
                 GeminiResearchTimeoutError,
@@ -333,12 +423,7 @@ class GeminiMarketResearch:
         raise last_error
 
     async def _request_interaction(self, body: dict[str, Any]) -> dict[str, Any]:
-        try:
-            await asyncio.wait_for(self._request_limit.acquire(), timeout=0.2)
-        except TimeoutError as exc:
-            raise GeminiResearchRateLimitError(
-                "Gemini Search is busy. Retry the request shortly."
-            ) from exc
+        await self._request_limit.acquire()
 
         try:
             async with httpx.AsyncClient(timeout=45.0, transport=self.transport) as client:
@@ -613,4 +698,6 @@ def _interaction_citations(response: dict[str, Any]) -> list[ResearchSource]:
     return _unique_sources(citations)
 
 
-market_research = GeminiMarketResearch()
+market_research = GeminiMarketResearch(
+    cache_snapshot_path=Path(__file__).resolve().parents[2] / ".cache" / "market-research.json"
+)

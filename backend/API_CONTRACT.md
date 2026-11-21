@@ -12,9 +12,10 @@ grounding annotations. Unverified prices, ratings, counts, ingredients, or claim
 or empty.
 
 Set `GEMINI_API_KEY` in `backend/.env`. `GEMINI_MODEL` selects the primary model and
-`GEMINI_FALLBACK_MODELS` is a comma-separated fallback list. Search results are cached in memory
-for `MARKET_DATA_CACHE_TTL_SECONDS` (default: 21,600 seconds / six hours) to reduce repeated
-grounded searches. The category taxonomy is static organization metadata; product counts are
+`GEMINI_FALLBACK_MODELS` is a comma-separated fallback list. Search results are cached on disk and in memory for
+`MARKET_DATA_CACHE_TTL_SECONDS` (default: 21,600 seconds / six hours) to reduce repeated
+grounded searches. Catalog and detail responses include `cached: true` when a snapshot is served
+from cache, including the snapshot fallback during Gemini rate limits. The category taxonomy is static organization metadata; product counts are
 not fabricated.
 
 ## Health and categories

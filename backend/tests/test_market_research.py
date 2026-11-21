@@ -153,6 +153,48 @@ def test_catalog_cache_returns_copy_without_repeating_paid_search():
     assert len(result.products) == 1
 
 
+def test_persistent_catalog_snapshot_survives_service_restart_and_rate_limit(tmp_path):
+    snapshot_path = tmp_path / "market-research.json"
+
+    def handle_success(_request):
+        return httpx.Response(
+            200,
+            json=_interaction(
+                _catalog_facts(),
+                [(PRODUCT_URL, "Dot & Key product page")],
+            ),
+        )
+
+    first_service = GeminiMarketResearch(
+        api_key="test-key",
+        model="gemini-primary",
+        fallback_models=[],
+        transport=httpx.MockTransport(handle_success),
+        cache_ttl_seconds=60,
+        cache_snapshot_path=snapshot_path,
+    )
+    first = asyncio.run(first_service.list_products())
+    assert first.cached is False
+
+    restarted_service = GeminiMarketResearch(
+        api_key="test-key",
+        model="gemini-primary",
+        fallback_models=[],
+        transport=httpx.MockTransport(lambda _request: httpx.Response(429)),
+        cache_ttl_seconds=60,
+        cache_snapshot_path=snapshot_path,
+    )
+    restarted_service._catalog_cache = (
+        0,
+        restarted_service._catalog_cache[1],
+    )
+
+    result = asyncio.run(restarted_service.list_products())
+
+    assert result.cached is True
+    assert result.products[0].name == "Vitamin C Brightening Serum"
+
+
 def test_product_detail_includes_only_records_with_google_search_citations():
     catalog_calls = 0
 
@@ -307,7 +349,7 @@ def test_research_uses_fallback_model_when_primary_is_unavailable():
     assert result.source == "api"
 
 
-def test_rate_limit_does_not_retry_fallback_models():
+def test_rate_limit_retries_fallback_models():
     requested_models = []
 
     def handle(request):
@@ -324,7 +366,7 @@ def test_rate_limit_does_not_retry_fallback_models():
     with pytest.raises(GeminiResearchRateLimitError):
         asyncio.run(service.list_products())
 
-    assert requested_models == ["gemini-primary"]
+    assert requested_models == ["gemini-primary", "gemini-fallback"]
 
 
 def test_invalid_credentials_fail_without_trying_fallback_models():

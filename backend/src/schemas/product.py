@@ -55,6 +55,7 @@ class ProductList(BaseModel):
     sources: list[ResearchSource] = Field(default_factory=list)
     fetched_at: str
     source: Literal["api"] = "api"
+    cached: bool = False
 
 
 class ProductCatalog(BaseModel):
@@ -65,6 +66,7 @@ class ProductCatalog(BaseModel):
     sources: list[ResearchSource] = Field(default_factory=list)
     fetched_at: str
     source: Literal["api"] = "api"
+    cached: bool = False
 
 
 class CustomerReview(BaseModel):
@@ -84,3 +86,4 @@ class ProductDetail(BaseModel):
     sources: list[ResearchSource] = Field(default_factory=list)
     fetched_at: str
     source: Literal["api"] = "api"
+    cached: bool = False
