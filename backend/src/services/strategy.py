@@ -1,353 +1,252 @@
-"""Strategy generation service — SWOT, gaps, trends, opportunities, forecast."""
+"""Derive a market brief from live product, competitor, and review research."""
 
-from datetime import datetime, timezone
-from typing import Annotated
+from datetime import UTC, datetime
+from typing import Any
 
-from src.schemas.strategy import (
-    SWOT,
-    MarketGap,
-    Trend,
-    Opportunity,
-    SalesForecast,
-    StrategyPanel,
-)
-from src.services.review_analyzer import ReviewAnalyzer
+from src.schemas.product import ResearchSource
+from src.schemas.review import ReviewAnalysis, ReviewInput, Theme
+from src.schemas.strategy import SWOT, MarketGap, Opportunity, StrategyPanel, Trend
 from src.services.comparator import ProductComparator
-from src.data.samples import get_product_detail, get_sample_reviews
+from src.services.review_analyzer import ReviewAnalyzer
+
+_GAP_ACTIONS = {
+    "Breakouts": "Review the formula's compatibility with acne-prone skin and clarify suitability guidance.",
+    "Packaging": "Test dispenser reliability and improve packaging usability.",
+    "Scent": "Review fragrance expectations and make scent information easier to find.",
+    "Sensitivity": "Clarify patch-testing guidance and suitability for reactive skin.",
+    "Texture": "Set clearer texture and layering expectations in product education.",
+    "Value": "Test bundle sizes or value messaging against the category price range.",
+    "White Cast": "Validate finish claims across skin tones before making inclusivity claims.",
+    "Effectiveness": "Set realistic usage timelines and explain outcomes supported by product evidence.",
+    "Skin Feel": "Improve guidance for different skin types and climate conditions.",
+}
 
 
 class StrategyGenerator:
-    """Generates strategy panel from review analysis and competitor comparison."""
+    """Derive a cautious product-specific brief from cited live records."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.review_analyzer = ReviewAnalyzer()
         self.comparator = ProductComparator()
 
-    def generate(self, product_id: str) -> StrategyPanel:
-        """Generate full strategy panel for a product."""
-        # Get product detail
-        detail = get_product_detail(product_id)
-        if not detail:
-            raise ValueError(f"Product not found: {product_id}")
-
+    def generate(self, product_id: str, detail: dict[str, Any]) -> StrategyPanel:
         product = detail["product"]
-        competitors = detail["competitors"]
-        sample_reviews = detail["sample_reviews"]
-
-        # Run review analysis
-        review_input = type("ReviewInput", (), {
-            "product_id": product_id,
-            "reviews": sample_reviews,
-            "competitor_ids": None
-        })()
-        review_analysis = self.review_analyzer.analyze(review_input)
-
-        # Run comparison
-        comparison = self.comparator.compare(product_id)
-
-        # Generate each section
-        swot = self._generate_swot(product, review_analysis, comparison)
-        gaps = self._identify_gaps(product, review_analysis, comparison)
-        trends = self._identify_trends(product, review_analysis)
-        opportunities = self._identify_opportunities(product, review_analysis, comparison, gaps)
-        forecast = self._generate_forecast(product, comparison)
-
+        reviews = detail["reviews"]
+        review_analysis = self.review_analyzer.analyze(
+            ReviewInput(
+                product_id=product_id,
+                reviews=[review["text"] for review in reviews],
+            ),
+            source="api",
+            sources=detail["sources"],
+        )
+        comparison = self.comparator.compare(product_id, detail)
+        gaps = self._identify_gaps(
+            review_analysis.top_complaint_themes,
+            review_analysis.sentiment.total,
+        )
         return StrategyPanel(
             product_id=product_id,
-            swot=swot,
+            swot=self._generate_swot(
+                product, detail["competitors"], comparison, review_analysis
+            ),
             market_gaps=gaps,
-            trends=trends,
-            opportunities=opportunities,
-            sales_forecast=forecast,
-            generated_at=datetime.now(timezone.utc).isoformat(),
-            source="sample",
+            trends=self._identify_review_signals(
+                review_analysis.top_praise_themes,
+                review_analysis.top_complaint_themes,
+                review_analysis.sentiment.total,
+            ),
+            opportunities=self._identify_opportunities(
+                product,
+                comparison,
+                review_analysis.top_praise_themes,
+                review_analysis.top_complaint_themes,
+            ),
+            sales_forecast=[],
+            forecast_note=(
+                "Not calculated: public product research does not provide a dated sales or "
+                "sell-through time series. Review counts are not a substitute for sales data."
+            ),
+            generated_at=datetime.now(UTC).isoformat(),
+            source="api",
+            sources=[ResearchSource.model_validate(source) for source in detail["sources"]],
         )
 
     def _generate_swot(
         self,
-        product: dict,
-        review_analysis,
-        comparison: dict,
+        product: dict[str, Any],
+        competitors: list[dict[str, Any]],
+        comparison: dict[str, Any],
+        review_analysis: ReviewAnalysis,
     ) -> SWOT:
-        """Generate SWOT analysis."""
-        strengths = []
-        weaknesses = []
-        opportunities = []
+        strengths = [
+            f"Retrieved reviews frequently praise {theme.name.lower()} "
+            f"({theme.mention_count} mentions)."
+            for theme in review_analysis.top_praise_themes[:2]
+        ]
+        weaknesses = [
+            f"Retrieved reviews report concerns about {theme.name.lower()} "
+            f"({theme.mention_count} mentions)."
+            for theme in review_analysis.top_complaint_themes[:2]
+        ]
+        if not weaknesses:
+            weaknesses.append(
+                "No recurring complaint was detected in the retrieved excerpts; this does not "
+                "establish that no product issues exist."
+            )
+
+        price_position = comparison["price_analysis"]["position"]
+        price = product.get("price_inr")
+        if price is not None and price_position in ("lowest", "below_average"):
+            strengths.append(f"Verified price of ₹{price} is below the available competitor average.")
+        elif price is not None and price_position in ("highest", "above_average"):
+            weaknesses.append(
+                f"Verified price of ₹{price} is above the available competitor average."
+            )
+
         threats = []
-
-        # Strengths from review praise
-        for theme in review_analysis.top_praise_themes:
-            if theme.sentiment == "positive":
-                strengths.append(f"Customers praise {theme.name.lower()} ({theme.mention_count} mentions)")
-
-        # Strengths from comparison
-        price_analysis = comparison.get("price_analysis", {})
-        rating_analysis = comparison.get("rating_analysis", {})
-
-        if price_analysis.get("position") in ("lowest", "below_average"):
-            strengths.append(f"Competitive pricing at ₹{product['price_inr']} ({price_analysis.get('position', '').replace('_', ' ')} vs competitors)")
-        if rating_analysis.get("position") in ("highest", "above_average"):
-            strengths.append(f"Strong rating of {product['rating']}/5 ({rating_analysis.get('position', '').replace('_', ' ')} vs competitors)")
-
-        # Weaknesses from review complaints
-        for theme in review_analysis.top_complaint_themes:
-            if theme.sentiment == "negative":
-                weaknesses.append(f"Customer complaints about {theme.name.lower()} ({theme.mention_count} mentions)")
-
-        if price_analysis.get("position") in ("highest", "above_average"):
-            weaknesses.append(f"Premium pricing at ₹{product['price_inr']} ({price_analysis.get('position', '').replace('_', ' ')} vs competitors)")
-
-        # Opportunities from gaps/trends
-        opportunities.append("Expand shade-inclusive marketing to address white cast concerns")
-        opportunities.append("Leverage ingredient transparency trend with detailed actives disclosure")
-        opportunities.append("Bundle with complementary products (cleanser + serum + moisturizer)")
-
-        # Threats from competitors
-        threats.append("Competitors launching similar actives at lower price points")
-        threats.append("Market saturation in Vitamin C / Niacinamide categories")
-        threats.append("Raw material cost volatility affecting margins")
+        priced_competitors = [
+            item for item in competitors if item.get("price_inr") is not None
+        ]
+        rated_competitors = [
+            item for item in competitors if item.get("rating") is not None
+        ]
+        if price is not None and priced_competitors:
+            lowest = min(priced_competitors, key=lambda item: item["price_inr"])
+            if lowest["price_inr"] < price:
+                threats.append(
+                    f"{lowest['brand']} has a lower verified listed price "
+                    f"(₹{lowest['price_inr']} vs ₹{price})."
+                )
+        rating = product.get("rating")
+        if rating is not None and rated_competitors:
+            highest_rated = max(rated_competitors, key=lambda item: item["rating"])
+            if highest_rated["rating"] > rating:
+                threats.append(
+                    f"{highest_rated['brand']} has a higher listed rating "
+                    f"({highest_rated['rating']}/5)."
+                )
+        if not threats:
+            threats.append(
+                "The available sourced competitor records do not show a clear price or rating disadvantage."
+            )
 
         return SWOT(
             strengths=strengths,
             weaknesses=weaknesses,
-            opportunities=opportunities,
+            opportunities=[
+                "Validate recurring public review signals with a larger, representative review set.",
+                "Recheck competitor prices and ratings before making time-sensitive campaign claims.",
+            ],
             threats=threats,
-            source="sample",
+            source="api",
         )
 
-    def _identify_gaps(
-        self,
-        product: dict,
-        review_analysis,
-        comparison: dict,
-    ) -> list[MarketGap]:
-        """Identify market gaps from reviews and comparison."""
+    def _identify_gaps(self, complaint_themes: list[Theme], total_reviews: int) -> list[MarketGap]:
         gaps = []
-
-        # Gap from white cast complaints
-        for theme in review_analysis.top_complaint_themes:
-            if theme.name == "White Cast" and theme.mention_count >= 2:
-                gaps.append(MarketGap(
-                    description="No truly invisible sunscreen/serum for deeper skin tones in this price segment",
-                    evidence=f"{theme.mention_count} reviews mention white cast on deeper skin tones",
-                    severity="high",
-                    source="sample",
-                ))
-
-        # Gap from breakout complaints
-        for theme in review_analysis.top_complaint_themes:
-            if theme.name == "Breakouts" and theme.mention_count >= 2:
-                gaps.append(MarketGap(
-                    description="Non-comedogenic claim not fully delivered for acne-prone users",
-                    evidence=f"{theme.mention_count} reviews report breakouts/clogged pores",
-                    severity="medium",
-                    source="sample",
-                ))
-
-        # Gap from packaging complaints
-        for theme in review_analysis.top_complaint_themes:
-            if theme.name == "Packaging" and theme.mention_count >= 2:
-                gaps.append(MarketGap(
-                    description="Packaging usability issues (pump failure, waste, pour control)",
-                    evidence=f"{theme.mention_count} reviews mention packaging problems",
-                    severity="low",
-                    source="sample",
-                ))
-
-        # Gap from competitor feature comparison
-        feature_comp = comparison.get("feature_comparison", {})
-        missing = feature_comp.get("competitors_have_not_dk", [])
-        if "Ceramides" in missing or "Hyaluronic Acid" in missing:
-            gaps.append(MarketGap(
-                description="Competitors offer barrier-repair ingredients (ceramides, HA) not in this formula",
-                evidence=f"Competitors include: {', '.join(missing[:5])}",
-                severity="medium",
-                source="sample",
-            ))
-
+        for theme in complaint_themes[:4]:
+            ratio = theme.mention_count / total_reviews if total_reviews else 0
+            severity = "high" if ratio >= 0.3 else "medium" if theme.mention_count >= 2 else "low"
+            evidence = theme.evidence[0] if theme.evidence else "No review excerpt available."
+            gaps.append(
+                MarketGap(
+                    description=_GAP_ACTIONS.get(
+                        theme.name,
+                        f"Investigate recurring customer feedback about {theme.name.lower()}.",
+                    ),
+                    evidence=(
+                        f"{theme.mention_count} of {total_reviews} retrieved review excerpts mention "
+                        f"{theme.name.lower()}. Example: “{evidence}”"
+                    ),
+                    severity=severity,
+                    source="api",
+                )
+            )
         return gaps
 
-    def _identify_trends(
-        self,
-        product: dict,
-        review_analysis,
+    @staticmethod
+    def _identify_review_signals(
+        praise_themes: list[Theme],
+        complaint_themes: list[Theme],
+        total_reviews: int,
     ) -> list[Trend]:
-        """Identify relevant market trends."""
-        trends = []
+        themes = sorted(
+            [*praise_themes, *complaint_themes],
+            key=lambda theme: theme.mention_count,
+            reverse=True,
+        )
+        return [
+            Trend(
+                name=f"Review signal: {theme.name}",
+                description=(
+                    "A product-specific signal in retrieved public reviews, not evidence of a "
+                    "category-wide market trend."
+                ),
+                relevance="high" if theme.mention_count >= 2 else "medium",
+                evidence=(
+                    f"{theme.mention_count} of {total_reviews} retrieved excerpts mention "
+                    f"{theme.name.lower()}."
+                ),
+                source="api",
+            )
+            for theme in themes[:4]
+        ]
 
-        # Trend: Ingredient transparency
-        trends.append(Trend(
-            name="Ingredient Transparency & Actives Education",
-            description="Consumers increasingly research actives percentages, pH, stability — demand full disclosure",
-            relevance="high",
-            evidence="Reviews mention specific ingredients (Vitamin C %, niacinamide %, ceramide complex) and stability concerns",
-            source="sample",
-        ))
-
-        # Trend: Skin barrier focus
-        trends.append(Trend(
-            name="Skin Barrier Repair & Minimal Routines",
-            description="Shift from aggressive actives to barrier-supportive, minimal routines (skin cycling, skin flooding)",
-            relevance="high",
-            evidence="Praise for ceramide/hyaluronic products; complaints about irritation from strong actives",
-            source="sample",
-        ))
-
-        # Trend: Inclusive shade/formulation
-        trends.append(Trend(
-            name="Inclusive Formulation for Indian Skin Tones",
-            description="Demand for no-white-cast, no-gray-cast products tested on deeper skin tones (Fitzpatrick IV-VI)",
-            relevance="high",
-            evidence="Multiple reviews flag white cast on NC40+ skin tones",
-            source="sample",
-        ))
-
-        # Trend: Multi-functional products
-        trends.append(Trend(
-            name="Multi-Functional Hybrid Products",
-            description="Consumers prefer 2-in-1/3-in-1 (moisturizer+SPF, serum+primer, toner+essence) to simplify routines",
-            relevance="medium",
-            evidence="Dot & Key's own Vitamin C Day Cream SPF 20 shows this direction; competitors launching hybrids",
-            source="sample",
-        ))
-
-        return trends
-
+    @staticmethod
     def _identify_opportunities(
-        self,
-        product: dict,
-        review_analysis,
-        comparison: dict,
-        gaps: list[MarketGap],
+        product: dict[str, Any],
+        comparison: dict[str, Any],
+        praise_themes: list[Theme],
+        complaint_themes: list[Theme],
     ) -> list[Opportunity]:
-        """Identify product/marketing opportunities."""
         opportunities = []
-
-        # From gaps
-        for gap in gaps:
-            if gap.severity == "high" and "white cast" in gap.description.lower():
-                opportunities.append(Opportunity(
-                    title="Reformulate for True Invisibility on All Skin Tones",
-                    description="Develop next-gen filter system with zero white cast, validated on Fitzpatrick IV-VI. Market as 'Invisible on Every Indian Skin Tone'.",
+        for theme in complaint_themes[:2]:
+            opportunities.append(
+                Opportunity(
+                    title=f"Address {theme.name.lower()} feedback",
+                    description=(
+                        f"Test a product or education improvement for {theme.name.lower()}; "
+                        "the signal comes from a limited set of retrieved public reviews."
+                    ),
                     type="feature_improvement",
-                    effort="high",
-                    impact="high",
-                    source="sample",
-                ))
-            if gap.severity == "medium" and "non-comedogenic" in gap.description.lower():
-                opportunities.append(Opportunity(
-                    title="Launch 'Acne-Safe' Certified Variant",
-                    description="Create non-comedogenic tested version with salicylic acid + niacinamide for acne-prone skin. Partner with dermatologists for certification.",
-                    type="new_product",
                     effort="medium",
-                    impact="high",
-                    source="sample",
-                ))
+                    impact="medium",
+                    source="api",
+                )
+            )
 
-        # From praise themes
-        for theme in review_analysis.top_praise_themes:
-            if theme.name == "Value" and theme.sentiment == "positive":
-                opportunities.append(Opportunity(
-                    title="Value-Focused Bundle Strategy",
-                    description="Bundle hero product with complementary items (cleanser + moisturizer) at 15% discount. Position as 'Complete Routine for ₹X'.",
+        if praise_themes:
+            top_theme = praise_themes[0]
+            opportunities.append(
+                Opportunity(
+                    title=f"Test a {top_theme.name.lower()}-led campaign",
+                    description=(
+                        f"Build a message variant around {top_theme.name.lower()} and validate "
+                        "it with a controlled test."
+                    ),
                     type="marketing_angle",
                     effort="low",
                     impact="medium",
-                    source="sample",
-                ))
+                    source="api",
+                )
+            )
 
-        # From trends
-        opportunities.append(Opportunity(
-            title="Barrier Repair Serum Line Extension",
-            description="Launch dedicated barrier repair serum (ceramides + cholesterol + fatty acids + panthenol) to ride barrier trend.",
-            type="new_product",
-            effort="medium",
-            impact="high",
-            source="sample",
-        ))
-
-        opportunities.append(Opportunity(
-            title="Dermatologist Co-Created Content Series",
-            description="Partner with 3-5 Indian dermatologists for 'Science of Skincare' content series. Builds trust, drives SEO, supports ingredient transparency trend.",
-            type="marketing_angle",
-            effort="low",
-            impact="medium",
-            source="sample",
-        ))
-
-        # Channel expansion
-        opportunities.append(Opportunity(
-            title="Quick Commerce (Blinkit/Zepto/Instamart) Expansion",
-            description="List top 5 SKUs on quick commerce platforms for impulse/emergency purchases. 15-20% revenue uplift observed by competitors.",
-            type="channel_expansion",
-            effort="medium",
-            impact="medium",
-            source="sample",
-        ))
-
+        price = product.get("price_inr")
+        if price is not None and comparison["price_analysis"]["position"] in (
+            "highest",
+            "above_average",
+        ):
+            opportunities.append(
+                Opportunity(
+                    title="Test value framing",
+                    description=(
+                        f"At the verified price of ₹{price}, compare bundle or size options "
+                        "with sourced lower-priced competitors; validate margin and conversion."
+                    ),
+                    type="marketing_angle",
+                    effort="medium",
+                    impact="medium",
+                    source="api",
+                )
+            )
         return opportunities
-
-    def _generate_forecast(
-        self,
-        product: dict,
-        comparison: dict,
-    ) -> list[SalesForecast]:
-        """Generate simple sales forecast (sample logic)."""
-        # Base estimates from review count and rating
-        review_count = product.get("review_count", 100)
-        rating = product.get("rating", 4.0)
-        price = product.get("price_inr", 500)
-
-        # Rough conversion: reviews ≈ 1-2% of buyers
-        estimated_buyers = review_count * 75  # Conservative multiplier
-
-        # Quarterly forecast
-        base_quarterly = estimated_buyers // 4
-
-        return [
-            SalesForecast(
-                period="Q1 2025",
-                estimated_units=base_quarterly,
-                estimated_revenue_inr=base_quarterly * price,
-                confidence="medium",
-                assumptions=[
-                    f"Based on {review_count} reviews (est. 1-2% review rate)",
-                    "Assumes steady demand, no major competitor launches",
-                    "No marketing spend increase factored in",
-                ],
-                source="sample",
-            ),
-            SalesForecast(
-                period="Q2 2025",
-                estimated_units=int(base_quarterly * 1.15),  # Summer sunscreen boost
-                estimated_revenue_inr=int(base_quarterly * 1.15 * price),
-                confidence="medium",
-                assumptions=[
-                    "Seasonal uplift for sunscreen/brightening categories",
-                    "Assumes new product launch in Q1 drives halo effect",
-                ],
-                source="sample",
-            ),
-            SalesForecast(
-                period="Q3 2025",
-                estimated_units=int(base_quarterly * 1.05),
-                estimated_revenue_inr=int(base_quarterly * 1.05 * price),
-                confidence="low",
-                assumptions=[
-                    "Monsoon season dip for sunscreen, steady for serums",
-                    "Festival season prep begins late Q3",
-                ],
-                source="sample",
-            ),
-            SalesForecast(
-                period="Q4 2025",
-                estimated_units=int(base_quarterly * 1.35),  # Festival/wedding season
-                estimated_revenue_inr=int(base_quarterly * 1.35 * price),
-                confidence="low",
-                assumptions=[
-                    "Diwali/wedding season peak for skincare gifting",
-                    "Assumes gift set launches and promotional campaigns",
-                ],
-                source="sample",
-            ),
-        ]

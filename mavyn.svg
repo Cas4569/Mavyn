@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" role="img" aria-labelledby="title desc">
+  <title id="title">Insight bloom mark</title>
+  <desc id="desc">A five-petal mark in coral, pink, yellow, aqua, and mint, joined at a plum center.</desc>
+  <g transform="translate(240 240)">
+    <path d="M0 12C-24-17-34-57 0-100C34-57 24-17 0 12Z" fill="#FF6F7F"/>
+    <path d="M0 12C-24-17-34-57 0-100C34-57 24-17 0 12Z" fill="#FFC94F" transform="rotate(72)"/>
+    <path d="M0 12C-24-17-34-57 0-100C34-57 24-17 0 12Z" fill="#61C7D8" transform="rotate(144)"/>
+    <path d="M0 12C-24-17-34-57 0-100C34-57 24-17 0 12Z" fill="#F28EAF" transform="rotate(216)"/>
+    <path d="M0 12C-24-17-34-57 0-100C34-57 24-17 0 12Z" fill="#72C9A6" transform="rotate(288)"/>
+    <circle r="17" fill="#34233F"/>
+  </g>
+</svg>

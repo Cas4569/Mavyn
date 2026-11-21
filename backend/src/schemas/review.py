@@ -1,7 +1,10 @@
 """Review analysis schemas."""
 
-from pydantic import BaseModel, Field
 from typing import Annotated, Literal
+
+from pydantic import BaseModel, Field
+
+from src.schemas.product import ResearchSource
 
 
 class ReviewInput(BaseModel):
@@ -30,7 +33,9 @@ class Theme(BaseModel):
     sentiment: Annotated[Literal["positive", "negative", "mixed"], Field(description="Overall sentiment of this theme")]
     mention_count: Annotated[int, Field(ge=0, description="How many reviews mention this")]
     evidence: Annotated[list[str], Field(description="Direct quotes from reviews", min_length=1)]
-    source: Annotated[Literal["sample", "llm"], Field(description="How this theme was derived")] = "sample"
+    source: Annotated[
+        Literal["api", "llm", "user"], Field(description="Review data source")
+    ] = "api"
 
 
 class ReviewAnalysis(BaseModel):
@@ -42,4 +47,5 @@ class ReviewAnalysis(BaseModel):
     top_complaint_themes: Annotated[list[Theme], Field(description="Top negative themes")]
     key_insights: Annotated[list[str], Field(description="High-level insights", default_factory=list)]
     analyzed_at: Annotated[str, Field(description="ISO timestamp of analysis")]
-    source: Annotated[Literal["sample", "llm"], Field(description="Analysis source")] = "sample"
+    source: Annotated[Literal["api", "llm", "user"], Field(description="Analysis source")] = "api"
+    sources: list[ResearchSource] = Field(default_factory=list)

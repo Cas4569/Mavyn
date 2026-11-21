@@ -1,7 +1,8 @@
 """Category schemas."""
 
-from pydantic import BaseModel, Field
 from typing import Annotated
+
+from pydantic import BaseModel, Field
 
 
 class Category(BaseModel):
@@ -9,7 +10,10 @@ class Category(BaseModel):
 
     id: Annotated[str, Field(description="Unique category identifier (slug)")]
     name: Annotated[str, Field(description="Display name")]
-    product_count: Annotated[int, Field(description="Number of products in this category", ge=0)]
+    product_count: Annotated[
+        int | None,
+        Field(description="Number of current researched products in this category", ge=0),
+    ] = None
     description: Annotated[str | None, Field(description="Optional category description")] = None
 
 

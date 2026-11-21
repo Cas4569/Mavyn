@@ -1,8 +1,9 @@
 """Categories routes."""
 
 from fastapi import APIRouter, HTTPException
+
+from src.data.categories import get_categories
 from src.schemas.category import CategoryList
-from src.data.samples import get_categories
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 

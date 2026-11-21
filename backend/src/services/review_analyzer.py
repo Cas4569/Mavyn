@@ -1,12 +1,12 @@
 """Review analysis service — analyzes customer reviews for sentiment and themes."""
 
-from datetime import datetime, timezone
-from typing import Annotated
-from collections import Counter
+from datetime import UTC, datetime
+from typing import ClassVar, Literal
 
+from src.schemas.product import ResearchSource
 from src.schemas.review import (
-    ReviewInput,
     ReviewAnalysis,
+    ReviewInput,
     SentimentBreakdown,
     Theme,
 )
@@ -15,10 +15,9 @@ from src.schemas.review import (
 class ReviewAnalyzer:
     """Analyzes review texts for sentiment, themes, and insights."""
 
-    # Simple keyword-based sentiment/theme detection for sample data
-    # In production, this would use an LLM or ML model
+    # Lightweight, explainable signal extraction from retrieved review excerpts.
 
-    POSITIVE_KEYWORDS = {
+    POSITIVE_KEYWORDS: ClassVar[set[str]] = {
         "love", "great", "amazing", "excellent", "perfect", "best", "awesome",
         "fantastic", "wonderful", "brilliant", "outstanding", "superb", "good",
         "nice", "happy", "satisfied", "pleased", "impressed", "recommend",
@@ -28,7 +27,7 @@ class ReviewAnalyzer:
         "non-greasy", "absorbs", "fast", "value", "affordable", "worth",
     }
 
-    NEGATIVE_KEYWORDS = {
+    NEGATIVE_KEYWORDS: ClassVar[set[str]] = {
         "hate", "terrible", "awful", "worst", "bad", "poor", "disappointed",
         "disappointing", "waste", "money", "regret", "return", "refund",
         "broke out", "breakout", "acne", "pimples", "clogged", "pores",
@@ -40,7 +39,7 @@ class ReviewAnalyzer:
         "tiny", "packaging", "pump", "broken", "leak", "waste product",
     }
 
-    THEME_KEYWORDS = {
+    THEME_KEYWORDS: ClassVar[dict[str, list[str]]] = {
         "Texture": [
             "texture", "consistency", "lightweight", "heavy", "thick", "thin",
             "watery", "gel", "cream", "lotion", "absorb", "absorption", "greasy",
@@ -92,19 +91,21 @@ class ReviewAnalyzer:
         ],
     }
 
-    def __init__(self):
-        pass
-
-    def analyze(self, input_data: ReviewInput) -> ReviewAnalysis:
+    def analyze(
+        self,
+        input_data: ReviewInput,
+        source: Literal["api", "llm", "user"] = "api",
+        sources: list[ResearchSource] | None = None,
+    ) -> ReviewAnalysis:
         """Analyze reviews and return structured analysis."""
-        reviews = input_data.reviews
+        reviews = input_data.reviews or []
 
         # Sentiment analysis
         sentiment = self._analyze_sentiment(reviews)
 
         # Theme extraction
-        praise_themes = self._extract_themes(reviews, positive=True)
-        complaint_themes = self._extract_themes(reviews, positive=False)
+        praise_themes = self._extract_themes(reviews, positive=True, source=source)
+        complaint_themes = self._extract_themes(reviews, positive=False, source=source)
 
         # Key insights
         insights = self._generate_insights(sentiment, praise_themes, complaint_themes)
@@ -115,8 +116,9 @@ class ReviewAnalyzer:
             top_praise_themes=praise_themes[:5],
             top_complaint_themes=complaint_themes[:5],
             key_insights=insights,
-            analyzed_at=datetime.now(timezone.utc).isoformat(),
-            source="sample",
+            analyzed_at=datetime.now(UTC).isoformat(),
+            source=source,
+            sources=sources or [],
         )
 
     def _analyze_sentiment(self, reviews: list[str]) -> SentimentBreakdown:
@@ -150,7 +152,12 @@ class ReviewAnalyzer:
             negative_pct=neg_pct,
         )
 
-    def _extract_themes(self, reviews: list[str], positive: bool) -> list[Theme]:
+    def _extract_themes(
+        self,
+        reviews: list[str],
+        positive: bool,
+        source: Literal["api", "llm", "user"],
+    ) -> list[Theme]:
         """Extract themes from reviews with sentiment filter."""
         theme_mentions: dict[str, list[str]] = {theme: [] for theme in self.THEME_KEYWORDS}
 
@@ -210,7 +217,7 @@ class ReviewAnalyzer:
                     sentiment=sentiment,
                     mention_count=len(evidence_list),
                     evidence=evidence_list[:3],  # Top 3 evidence quotes
-                    source="sample",
+                    source=source,
                 ))
 
         # Sort by mention count descending

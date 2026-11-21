@@ -27,7 +27,12 @@ export const api = {
   health: () => request('/health'),
   categories: () => request('/categories'),
   products: (categoryId) => request(`/products?category=${encodeURIComponent(categoryId)}`),
+  dotAndKeyProducts: () => request('/products/dot-and-key'),
   product: (productId) => request(`/products/${encodeURIComponent(productId)}`),
+  productComparison: (productId) =>
+    request(`/products/${encodeURIComponent(productId)}/comparison`),
+  productStrategy: (productId) =>
+    request(`/products/${encodeURIComponent(productId)}/strategy`),
   analyzeReviews: (productId) =>
     request('/reviews/analyze', {
       method: 'POST',
@@ -36,6 +41,6 @@ export const api = {
   generateContent: (productId) =>
     request('/content/generate', {
       method: 'POST',
-      body: JSON.stringify({ product_id: productId }),
+      body: JSON.stringify({ product_id: productId, provider: 'gemini' }),
     }),
 }

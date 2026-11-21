@@ -1,52 +1,66 @@
 """Schema package exports."""
 
 from src.schemas.category import Category, CategoryList
-from src.schemas.product import Product, ProductList, Competitor, ProductDetail
-from src.schemas.review import (
-    ReviewInput,
-    ReviewAnalysis,
-    SentimentBreakdown,
-    Theme,
-)
-from src.schemas.strategy import SWOT, MarketGap, Trend, Opportunity, StrategyPanel
 from src.schemas.content import (
+    AdCopy,
+    AdScript,
     ContentRequest,
     ContentResponse,
-    AdCopy,
-    ProductDescription,
     ListingContent,
-    AdScript,
+    ProductDescription,
     StoryboardFrame,
     VideoConcept,
 )
+from src.schemas.product import (
+    Competitor,
+    CustomerReview,
+    Product,
+    ProductCatalog,
+    ProductDetail,
+    ProductList,
+    ResearchSource,
+)
+from src.schemas.review import (
+    ReviewAnalysis,
+    ReviewInput,
+    SentimentBreakdown,
+    Theme,
+)
+from src.schemas.strategy import (
+    SWOT,
+    MarketGap,
+    Opportunity,
+    SalesForecast,
+    StrategyPanel,
+    Trend,
+)
 
 __all__ = [
-    # Category
+    "SWOT",
+    "AdCopy",
+    "AdScript",
     "Category",
     "CategoryList",
-    # Product
-    "Product",
-    "ProductList",
     "Competitor",
-    "ProductDetail",
-    # Review
-    "ReviewInput",
-    "ReviewAnalysis",
-    "SentimentBreakdown",
-    "Theme",
-    # Strategy
-    "SWOT",
-    "MarketGap",
-    "Trend",
-    "Opportunity",
-    "StrategyPanel",
-    # Content
     "ContentRequest",
     "ContentResponse",
-    "AdCopy",
-    "ProductDescription",
+    "CustomerReview",
     "ListingContent",
-    "AdScript",
+    "MarketGap",
+    "Opportunity",
+    "Product",
+    "ProductCatalog",
+    "ProductDescription",
+    "ProductDetail",
+    "ProductList",
+    "ResearchSource",
+    "ReviewAnalysis",
+    "ReviewInput",
+    "SalesForecast",
+    "SentimentBreakdown",
     "StoryboardFrame",
+    "StrategyPanel",
+    "Theme",
+    "Trend",
     "VideoConcept",
 ]

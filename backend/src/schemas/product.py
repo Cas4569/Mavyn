@@ -1,8 +1,15 @@
 """Product and competitor schemas."""
 
+from typing import Annotated, Literal
+
 from pydantic import BaseModel, Field, HttpUrl
-from typing import Annotated, Literal, Union
-from decimal import Decimal
+
+
+class ResearchSource(BaseModel):
+    """A URL citation returned by Gemini's Google Search grounding."""
+
+    title: str
+    url: HttpUrl
 
 
 class BaseProduct(BaseModel):
@@ -10,18 +17,21 @@ class BaseProduct(BaseModel):
 
     id: Annotated[str, Field(description="Unique product identifier")]
     name: Annotated[str, Field(description="Product name")]
-    price_inr: Annotated[int, Field(description="Price in Indian Rupees", ge=0)]
-    rating: Annotated[float, Field(description="Average rating (0-5)", ge=0, le=5)]
-    review_count: Annotated[int, Field(description="Number of reviews", ge=0)]
-    source: Annotated[Literal["sample", "scraped", "api"], Field(description="Data source")] = "sample"
+    price_inr: Annotated[int | None, Field(description="Current price in Indian Rupees", ge=0)]
+    rating: Annotated[float | None, Field(description="Average rating (0-5)", ge=0, le=5)]
+    review_count: Annotated[int | None, Field(description="Number of reviews", ge=0)]
+    source: Annotated[Literal["api"], Field(description="Grounded live data source")] = "api"
+    sources: list[ResearchSource] = Field(default_factory=list)
 
 
 class Competitor(BaseProduct):
     """A competitor product."""
 
     brand: Annotated[str, Field(description="Brand name")]
-    key_ingredients: Annotated[list[str], Field(description="Key active ingredients")]
-    usp: Annotated[str, Field(description="Unique selling proposition")]
+    key_ingredients: Annotated[list[str], Field(description="Key active ingredients")] = Field(
+        default_factory=list
+    )
+    usp: Annotated[str | None, Field(description="Unique selling proposition")] = None
     image_url: Annotated[HttpUrl | None, Field(description="Product image URL")] = None
 
 
@@ -31,6 +41,7 @@ class Product(BaseProduct):
     category_id: Annotated[str, Field(description="Category this product belongs to")]
     hero_image: Annotated[HttpUrl | None, Field(description="Hero image URL")] = None
     tagline: Annotated[str | None, Field(description="Marketing tagline")] = None
+    key_ingredients: list[str] = Field(default_factory=list)
     is_dot_and_key: Annotated[bool, Field(description="Whether this is a Dot & Key product", default=True)] = True
 
 
@@ -41,13 +52,35 @@ class ProductList(BaseModel):
     category_name: str
     products: list[Product]  # Dot & Key products only in list
     total: int
+    sources: list[ResearchSource] = Field(default_factory=list)
+    fetched_at: str
+    source: Literal["api"] = "api"
+
+
+class ProductCatalog(BaseModel):
+    """Live Dot & Key product catalog."""
+
+    products: list[Product]
+    total: int
+    sources: list[ResearchSource] = Field(default_factory=list)
+    fetched_at: str
+    source: Literal["api"] = "api"
+
+
+class CustomerReview(BaseModel):
+    """A public review excerpt cited from a grounded source."""
+
+    text: str
+    source: ResearchSource
+    published_at: str | None = None
 
 
 class ProductDetail(BaseModel):
-    """Full product detail with competitors and sample reviews."""
+    """Full live product detail with competitors, review excerpts, and citations."""
 
     product: Product
     competitors: list[Competitor]
-    sample_reviews: Annotated[
-        list[str], Field(description="Sample customer reviews for analysis", default_factory=list)
-    ]
+    reviews: list[CustomerReview] = Field(default_factory=list)
+    sources: list[ResearchSource] = Field(default_factory=list)
+    fetched_at: str
+    source: Literal["api"] = "api"
