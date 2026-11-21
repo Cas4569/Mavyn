@@ -149,7 +149,7 @@ export default function App() {
 
       <footer className="footer app-footer">
         <span>MAVYN · Sample data unless a source is stated otherwise</span>
-        <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">
+        <a href="/api/docs" target="_blank" rel="noreferrer">
           Backend API docs <ArrowUpRight size={14} aria-hidden="true" />
         </a>
       </footer>
