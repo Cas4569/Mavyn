@@ -9,6 +9,7 @@ from src.services.market_research import (
     GeminiResearchAuthenticationError,
     GeminiResearchOutputError,
     GeminiResearchProviderError,
+    GeminiResearchRateLimitError,
 )
 
 PRODUCT_URL = "https://www.dotandkey.com/products/vitamin-c-serum"
@@ -304,6 +305,26 @@ def test_research_uses_fallback_model_when_primary_is_unavailable():
 
     assert requested_models == ["gemini-primary", "gemini-fallback"]
     assert result.source == "api"
+
+
+def test_rate_limit_does_not_retry_fallback_models():
+    requested_models = []
+
+    def handle(request):
+        requested_models.append(json.loads(request.content)["model"])
+        return httpx.Response(429)
+
+    service = GeminiMarketResearch(
+        api_key="test-key",
+        model="gemini-primary",
+        fallback_models=["gemini-fallback"],
+        transport=httpx.MockTransport(handle),
+    )
+
+    with pytest.raises(GeminiResearchRateLimitError):
+        asyncio.run(service.list_products())
+
+    assert requested_models == ["gemini-primary"]
 
 
 def test_invalid_credentials_fail_without_trying_fallback_models():

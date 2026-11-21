@@ -318,9 +318,10 @@ class GeminiMarketResearch:
                 return result, citations
             except GeminiResearchAuthenticationError:
                 raise
+            except GeminiResearchRateLimitError:
+                raise
             except (
                 GeminiResearchModelUnavailableError,
-                GeminiResearchRateLimitError,
                 GeminiResearchTimeoutError,
                 GeminiResearchProviderError,
                 GeminiResearchOutputError,
