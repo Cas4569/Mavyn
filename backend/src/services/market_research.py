@@ -404,7 +404,23 @@ class NimMarketResearch:
                 text = response.get("choices", [{}])[0].get("message", {}).get("content", "")
                 if not isinstance(text, str) or not text.strip():
                     raise NimResearchOutputError("NIM returned no structured text.")
-                result = json.loads(text)
+                # Strip markdown code fences if NIM wrapped JSON in ```json ... ```
+                cleaned = text.strip()
+                if cleaned.startswith("```"):
+                    # Remove opening ```json or ``` fence
+                    cleaned = re.sub(r"^```\w*\n?", "", cleaned)
+                    # Remove closing ``` fence
+                    cleaned = re.sub(r"\n?```$", "", cleaned)
+                try:
+                    result = json.loads(cleaned)
+                except json.JSONDecodeError:
+                    # Last-resort salvage: try to extract the first balanced JSON object
+                    try:
+                        result = _extract_first_json_object(cleaned)
+                    except Exception:
+                        raise NimResearchOutputError(
+                            "NIM returned invalid JSON that could not be repaired."
+                        )
                 if not isinstance(result, dict):
                     raise NimResearchOutputError("NIM returned an invalid data object.")
                 return result, search_results_to_sources(search_results)
@@ -429,7 +445,7 @@ class NimMarketResearch:
     async def _nim_request(self, body: dict[str, Any]) -> dict[str, Any]:
         await self._request_limit.acquire()
         try:
-            async with httpx.AsyncClient(timeout=45.0, transport=self.transport) as client:
+            async with httpx.AsyncClient(timeout=90.0, transport=self.transport) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
                     headers={
@@ -519,6 +535,36 @@ def search_results_to_sources(results: list[SearchResult]) -> list[ResearchSourc
         except ValidationError:
             continue
     return _unique_sources(sources)
+
+
+def _extract_first_json_object(text: str) -> dict[str, Any]:
+    """Attempt to extract the first balanced JSON object from garbled text."""
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("No JSON object found")
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape:
+            escape = False
+            continue
+        if c == "\\" and in_string:
+            escape = True
+            continue
+        if c == '"' and not escape:
+            in_string = not in_string
+            continue
+        if not in_string:
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    snippet = text[start:i+1]
+                    return json.loads(snippet)
+    raise ValueError("Unterminated JSON object")
 
 
 def _build_product(

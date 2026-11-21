@@ -1,25 +1,25 @@
 import httpx
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 api_key = os.getenv("NIM_API_KEY")
-if not api_key:
-    print("No NIM API key found")
-    exit(1)
-
 url = "https://integrate.api.nvidia.com/v1/chat/completions"
-headers = {
-    "Authorization": f"Bearer {os.getenv('NIM_API_KEY')}",
-    "Content-Type": "application/json"
-}
 payload = {
-    "model": "deepseek-ai/deepseek-v4.1-flash",
+    "model": "mistralai/mistral-large-4-1t-a52b",
     "messages": [{"role": "user", "content": "Hello"}],
     "max_tokens": 10
 }
 
 try:
-    response = httpx.post(url, headers=headers, json=payload, timeout=10)
+    response = httpx.post(
+        url,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=60
+    )
     print("Status:", response.status_code)
-    print("Body:", response.text[:500])
+    print("Body:", response.text)
 except Exception as e:
     print("Error:", e)

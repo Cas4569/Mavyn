@@ -7,21 +7,19 @@ from src.services.market_research import NimMarketResearch
 
 async def main():
     print("Testing Tavily search...")
-    results = await tavily_search.search("Dot & Key Vitamin C serum")
+    results = await tavily_search.search("Dot & Key")
     print(f"Found {len(results)} results")
-    for i, r in enumerate(results[:3]):
-        print(f"{i+1}. {r.title} - {r.url}")
-    
-    # Test NIM processing
+
     print("\nTesting NIM processing...")
     try:
         r = NimMarketResearch()
         print('API key configured:', bool(r.api_key))
-        print('Model:', r.model)
-        print('Fallbacks:', r.fallback_models)
         catalog = await r.list_products()
         print('SUCCESS - Got catalog with', len(catalog.products), 'products')
     except Exception as e:
         print('ERROR:', type(e).__name__, str(e))
 
-asyncio.run(main())
+if __name__ == "__main__":
+    # Fix unicode issues by forcing utf-8 for stdout
+    sys.stdout.reconfigure(encoding='utf-8')
+    asyncio.run(main())
