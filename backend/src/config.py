@@ -29,8 +29,8 @@ class Settings(BaseSettings):
 
     # Gemini
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-3.5-flash-lite"
-    gemini_fallback_models: str = "gemini-3.6-flash,gemini-3.8-flash"
+    gemini_model: str = "gemini-3.6-flash"
+    gemini_fallback_models: str = "gemini-3.5-flash-lite,gemini-3.8-flash"
     market_data_cache_ttl_seconds: int = 21600
 
 

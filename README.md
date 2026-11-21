@@ -19,7 +19,7 @@ npm --prefix frontend ci
 
 Copy `backend\.env.example` to `backend\.env` and set `GEMINI_API_KEY` there. Keep the key
 server-side; do not put it in a `VITE_` variable or share it in chat. The default model is
-`gemini-3.5-flash-lite` and can be changed with `GEMINI_MODEL`. Restart the backend after editing
+`gemini-3.6-flash` and can be changed with `GEMINI_MODEL`. Restart the backend after editing
 the file. Content generation returns a clear configuration error when the key is missing rather
 than presenting template output as AI-generated. Gemini model selection is configurable with
 `GEMINI_MODEL` and the comma-separated `GEMINI_FALLBACK_MODELS`; the backend tries at most three
