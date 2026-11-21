@@ -4,24 +4,21 @@ Skincare market intelligence demo with a React/Vite frontend and FastAPI backend
 
 ## Run locally
 
-Use two terminals from the repository root.
+Set up the dependencies once, then start both servers from the repository root with one command.
 
-**Backend**
+**First-time setup (PowerShell)**
 
 ```sh
-cd backend
-python -m venv .venv
-source .venv/Scripts/activate
-pip install -e .
-python -m uvicorn src.main:app --reload --host 127.0.0.1 --port 8000
+python -m venv backend\.venv
+backend\.venv\Scripts\python.exe -m pip install -e .\backend
+npm install
+npm --prefix frontend ci
 ```
 
-**Frontend**
+**Start the app**
 
 ```sh
-cd frontend
-npm ci
 npm run dev
 ```
 
-Run the install commands the first time (or after dependencies change). Open the URL Vite prints. The API docs are at [http://localhost:8000/docs](http://localhost:8000/docs). The Vite development proxy forwards frontend `/api` requests to the backend.
+Open the URL Vite prints. The API docs are at [http://localhost:8000/docs](http://localhost:8000/docs). The Vite development proxy forwards frontend `/api` requests to the backend. Stop both servers with `Ctrl+C`.

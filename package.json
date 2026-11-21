@@ -1,0 +1,10 @@
+{
+  "name": "mavyn",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --kill-others --names backend,frontend \".\\backend\\.venv\\Scripts\\python.exe -m uvicorn src.main:app --reload --host 127.0.0.1 --port 8000 --app-dir backend\" \"npm --prefix frontend run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
