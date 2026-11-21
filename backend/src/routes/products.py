@@ -6,7 +6,7 @@ from src.routes.research_errors import research_http_exception
 from src.schemas.product import ProductCatalog, ProductDetail, ProductList
 from src.schemas.strategy import StrategyPanel
 from src.services.comparator import ProductComparator
-from src.services.market_research import GeminiResearchError, market_research
+from src.services.market_research import NimResearchError, market_research
 from src.services.strategy import StrategyGenerator
 
 router = APIRouter(prefix="/products", tags=["products"])
