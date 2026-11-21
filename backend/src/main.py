@@ -1,16 +1,23 @@
 """MAVYN Backend — FastAPI application entry point."""
 
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+backend_root = str(Path(__file__).resolve().parents[1])
+if backend_root not in sys.path:
+    sys.path.insert(0, backend_root)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import settings
 from src.routes import (
-    health_router,
     categories_router,
+    content_router,
+    health_router,
     products_router,
     reviews_router,
-    content_router,
 )
 
 
