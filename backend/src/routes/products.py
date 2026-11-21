@@ -19,7 +19,7 @@ async def list_products(category: str = Query(..., description="Category ID to f
     """List current Dot & Key products researched and cited from Google Search."""
     try:
         products = await market_research.list_products_by_category(category)
-    except GeminiResearchError as exc:
+    except NimResearchError as exc:
         raise research_http_exception(exc) from exc
     if products is None:
         raise HTTPException(status_code=404, detail="No live product records found for category.")
@@ -31,7 +31,7 @@ async def list_dot_and_key_products():
     """List current Dot & Key products with Google Search citations."""
     try:
         return await market_research.list_products()
-    except GeminiResearchError as exc:
+    except NimResearchError as exc:
         raise research_http_exception(exc) from exc
 
 
@@ -40,7 +40,7 @@ async def get_product(product_id: str):
     """Get live product, competitor, and review data with source citations."""
     try:
         detail = await market_research.get_product_detail(product_id)
-    except GeminiResearchError as exc:
+    except NimResearchError as exc:
         raise research_http_exception(exc) from exc
     if detail is None:
         raise HTTPException(status_code=404, detail="Product not found in the live catalog.")
@@ -55,7 +55,7 @@ async def compare_product(product_id: str):
         if detail is None:
             raise HTTPException(status_code=404, detail="Product not found in the live catalog.")
         return comparator.compare(product_id, detail.model_dump(mode="json"))
-    except GeminiResearchError as exc:
+    except NimResearchError as exc:
         raise research_http_exception(exc) from exc
 
 
@@ -67,5 +67,5 @@ async def get_product_strategy(product_id: str):
         if detail is None:
             raise HTTPException(status_code=404, detail="Product not found in the live catalog.")
         return strategy_generator.generate(product_id, detail.model_dump(mode="json"))
-    except GeminiResearchError as exc:
+    except NimResearchError as exc:
         raise research_http_exception(exc) from exc

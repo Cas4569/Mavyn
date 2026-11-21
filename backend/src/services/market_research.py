@@ -36,6 +36,10 @@ class NimResearchError(Exception):
     """Base error for NVIDIA NIM research."""
 
 
+class NimResearchConfigurationError(NimResearchError):
+    """NIM or Tavily research is not configured."""
+
+
 class NimResearchAuthenticationError(NimResearchError):
     """NIM rejected the configured API key or model."""
 
@@ -710,3 +714,14 @@ def _schema_for(model: type[BaseModel]) -> dict[str, Any]:
 market_research = NimMarketResearch(
     cache_snapshot_path=Path(__file__).resolve().parents[2] / ".cache" / "market-research.json"
 )
+
+# Compatibility aliases for callers and tests from the former Gemini implementation.
+GeminiResearchError = NimResearchError
+GeminiResearchConfigurationError = NimResearchConfigurationError
+GeminiResearchAuthenticationError = NimResearchAuthenticationError
+GeminiResearchModelUnavailableError = NimResearchModelUnavailableError
+GeminiResearchRateLimitError = NimResearchRateLimitError
+GeminiResearchTimeoutError = NimResearchTimeoutError
+GeminiResearchProviderError = NimResearchProviderError
+GeminiResearchOutputError = NimResearchOutputError
+GeminiMarketResearch = NimMarketResearch

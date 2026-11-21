@@ -20,7 +20,10 @@ class BaseProduct(BaseModel):
     price_inr: Annotated[int | None, Field(description="Current price in Indian Rupees", ge=0)]
     rating: Annotated[float | None, Field(description="Average rating (0-5)", ge=0, le=5)]
     review_count: Annotated[int | None, Field(description="Number of reviews", ge=0)]
-    source: Annotated[Literal["api"], Field(description="Grounded live data source")] = "api"
+    source: Annotated[
+        Literal["api", "sample"],
+        Field(description="Live API or explicitly labeled sample data source"),
+    ] = "api"
     sources: list[ResearchSource] = Field(default_factory=list)
 
 
@@ -54,7 +57,7 @@ class ProductList(BaseModel):
     total: int
     sources: list[ResearchSource] = Field(default_factory=list)
     fetched_at: str
-    source: Literal["api"] = "api"
+    source: Literal["api", "sample"] = "api"
     cached: bool = False
 
 
@@ -65,7 +68,7 @@ class ProductCatalog(BaseModel):
     total: int
     sources: list[ResearchSource] = Field(default_factory=list)
     fetched_at: str
-    source: Literal["api"] = "api"
+    source: Literal["api", "sample"] = "api"
     cached: bool = False
 
 
@@ -85,5 +88,5 @@ class ProductDetail(BaseModel):
     reviews: list[CustomerReview] = Field(default_factory=list)
     sources: list[ResearchSource] = Field(default_factory=list)
     fetched_at: str
-    source: Literal["api"] = "api"
+    source: Literal["api", "sample"] = "api"
     cached: bool = False

@@ -17,7 +17,7 @@ from src.services.gemini_content_generator import (
     GeminiRateLimitError,
     GeminiTimeoutError,
 )
-from src.services.market_research import GeminiResearchError, market_research
+from src.services.market_research import NimResearchError, market_research
 
 router = APIRouter(prefix="/content", tags=["content"])
 
@@ -63,7 +63,7 @@ async def generate_content(request: ContentRequest, http_request: Request):
         return await gemini_generator.generate(request, detail.model_dump(mode="json"))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except GeminiResearchError as e:
+    except NimResearchError as e:
         raise research_http_exception(e) from e
     except GeminiConfigurationError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
