@@ -24,7 +24,13 @@ from src.schemas.product import (
     ProductList,
     ResearchSource,
 )
-from src.services.tavily_search import tavily_search, SearchResult
+from src.services.tavily_search import (
+    SearchResult,
+    TavilySearchAuthenticationError,
+    TavilySearchProviderError,
+    TavilySearchRateLimitError,
+    tavily_search,
+)
 
 
 _SYSTEM_PROMPT = """You are a market research analyst. Extract verified product facts from the supplied web search results.
@@ -373,7 +379,16 @@ class NimMarketResearch:
             )
 
         # Stage 1: search for live evidence
-        search_results = await tavily_search.search(prompt)
+        try:
+            search_results = await tavily_search.search(prompt)
+        except TavilySearchAuthenticationError as exc:
+            raise NimResearchAuthenticationError(
+                "Tavily rejected the configured API key."
+            ) from exc
+        except TavilySearchRateLimitError as exc:
+            raise NimResearchRateLimitError(str(exc)) from exc
+        except TavilySearchProviderError as exc:
+            raise NimResearchProviderError(str(exc)) from exc
         evidence_text = self._format_evidence(search_results)
 
         # Stage 2: NIM extracts structured facts from the evidence
@@ -483,7 +498,8 @@ class NimMarketResearch:
             )
 
         try:
-            return response.json()
+            "response_format": {"type": "json_object"},
+"            temperature": 0.2,
         except ValueError as exc:
             raise NimResearchOutputError("NIM Search returned an invalid response.") from exc
 

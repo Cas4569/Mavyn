@@ -40,8 +40,8 @@ class Settings(BaseSettings):
 
     # NVIDIA NIM (reasoning over the search evidence)
     nim_api_key: SecretStr | None = None
-    nim_model: str = "deepseek-ai/deepseek-v4.1-flash"
-    nim_fallback_models: str = "nvidia/nemotron-3.5-flash"
+    nim_model: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
+    nim_fallback_models: str = ""
     nim_base_url: str = "https://integrate.api.nvidia.com/v1"
 
 
