@@ -44,8 +44,16 @@ export default function App() {
   useEffect(() => {
     let active = true
     api.health()
-      .then(() => {
-        if (active) setApiState({ status: 'online', error: '' })
+      .then((health) => {
+        if (!active) return
+        if (health.research_ready === false) {
+          setApiState({
+            status: 'offline',
+            error: 'Live research is not configured. Set NIM_API_KEY and TAVILY_API_KEY in the backend.',
+          })
+          return
+        }
+        setApiState({ status: 'online', error: '' })
       })
       .catch((error) => {
         if (active) setApiState({ status: 'offline', error: error.message })

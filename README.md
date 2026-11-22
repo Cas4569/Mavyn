@@ -15,15 +15,15 @@ npm install
 npm --prefix frontend ci
 ```
 
-**Configure Gemini**
+**Configure live research**
 
-Copy `backend\.env.example` to `backend\.env` and set `GEMINI_API_KEY` there. Keep the key
-server-side; do not put it in a `VITE_` variable or share it in chat. The default model is
-`gemini-3.6-flash` and can be changed with `GEMINI_MODEL`. Restart the backend after editing
-the file. Content generation returns a clear configuration error when the key is missing rather
-than presenting template output as AI-generated. Gemini model selection is configurable with
-`GEMINI_MODEL` and the comma-separated `GEMINI_FALLBACK_MODELS`; the backend tries at most three
-models and does not retry credential errors.
+Copy `backend\.env.example` to `backend\.env` and set `NIM_API_KEY` and `TAVILY_API_KEY`
+there. Keep both keys server-side; do not put them in a `VITE_` variable or share them in chat.
+Restart the backend after editing the file. `/health` reports whether both providers are configured.
+
+For a Vercel deployment, add `NIM_API_KEY`, `TAVILY_API_KEY`, `NIM_MODEL`,
+`NIM_FALLBACK_MODELS`, and `NIM_BASE_URL` as environment variables for the backend project,
+then redeploy.
 
 **Start the app**
 
